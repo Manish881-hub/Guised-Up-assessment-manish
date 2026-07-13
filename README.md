@@ -1,133 +1,123 @@
 # Guised Up — Real Connections Feed
 
-A social feed platform that surfaces genuine human connections by combining AI-powered content embedding with intuitive, conversation-first interactions. Built as a submission for the Guised Up founding engineer assessment.
+A social feed platform that ranks content by authenticity, relationship depth, semantic relevance, and recency — not engagement metrics. Built as a submission for the Guised Up founding engineer assessment.
 
 ## Architecture
 
-Guised Up follows a modular architecture with four main components:
-
 ```
-┌─────────────────┐     ┌──────────────────┐
-│  React Native   │◄────│  Laravel API     │
-│  (Mobile App)   │ HTTP│  (Backend)       │
-└─────────────────┘     └────────┬─────────┘
+┌─────────────────┐     ┌──────────────────┐     ┌──────────────────────┐
+│  React Native   │────▶│  Laravel API      │────▶│  PostgreSQL +        │
+│  (Expo Mobile)  │HTTP │  (Docker)         │     │  pgvector             │
+└─────────────────┘     └────────┬─────────┘     └──────────────────────┘
                                  │
-                    ┌────────────┴────────────┐
-                    │  PostgreSQL + pgvector   │
-                    │  (Database)              │
-                    └────────────┬─────────────┘
-                                 │
-                    ┌────────────┴────────────┐
-                    │  Python Embedding        │
-                    │  Sidecar (FastAPI)       │
-                    └─────────────────────────┘
+                     ┌───────────┴───────────┐
+                     │  Python Embedding      │
+                     │  Sidecar (FastAPI)     │
+                     └───────────────────────┘
 ```
 
-| Component         | Technology                  | Purpose                              |
-|-------------------|-----------------------------|--------------------------------------|
-| Mobile App        | React Native                | Cross-platform iOS / Android UI      |
-| API               | Laravel 11 + Sanctum        | RESTful backend with auth            |
-| Database          | PostgreSQL + pgvector        | Relational data + vector similarity  |
-| Embedding Service | Python / FastAPI            | Generates post embeddings            |
+- **Mobile:** React Native (Expo) — FeedScreen with infinite scroll, search, authenticity badges
+- **API:** Laravel 11 + Sanctum token auth — runs in Docker (php:8.4-cli)
+- **Database:** PostgreSQL 16 + pgvector — stores relational data + 384-dim vectors
+- **Embeddings:** Python FastAPI with sentence-transformers (all-MiniLM-L6-v2)
 
-## Table of Contents
+## Documentation
 
-- [Prerequisites](#prerequisites)
-- [Setup](#setup)
-  - [Database](#database)
-  - [Embedding Service](#embedding-service)
-  - [Laravel API](#laravel-api)
-  - [Mobile App](#mobile-app)
-- [API Endpoints](#api-endpoints)
-- [Running Tests](#running-tests)
-- [Credits](#credits)
+- [Technical Solution Document](./docs/TSD.md) — architecture decisions, ranking algorithm, trade-offs
+- [SQL Challenge Queries](./sql/queries.sql) — D1–D4
 
 ## Prerequisites
 
-- **PHP** 8.2+
-- **Composer** (latest)
-- **PostgreSQL** 15+ with [pgvector](https://github.com/pgvector/pgvector) extension
-- **Python** 3.12+
-- **Node.js** 18+
-- **npm** or **yarn**
+- **Docker Desktop** — runs PostgreSQL + Laravel API
+- **Python 3.12+** — runs embedding service
+- **Node.js 20+** — runs Expo mobile app
 
-## Setup
+## Quick Start
 
-### Database
+### 1. PostgreSQL with pgvector
 
-```bash
-createdb guised_up
-psql -d guised_up -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```powershell
+docker run -d --name guisedup-pg -p 5432:5432 `
+  -e POSTGRES_DB=guised_up -e POSTGRES_PASSWORD=postgres `
+  pgvector/pgvector:pg16
 ```
 
-Run the Laravel migrations (see API setup below) to create the schema.
+### 2. Embedding Service
 
-### Embedding Service
-
-```bash
+```powershell
 cd embedding-service
-python -m venv venv
-# On Windows: venv\Scripts\activate
-# On macOS/Linux: source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+python main.py
 ```
+Verify: `curl http://localhost:8001/health` → `{"status":"ok"}`
 
-The embedding service runs on `http://localhost:8000` and exposes a `/embed` endpoint that the Laravel API calls asynchronously.
+### 3. Laravel API (Docker)
 
-### Laravel API
-
-> **Important:** The `backend/` folder in this repository is an application-layer code bundle. See [SETUP_NOTE.md](backend/SETUP_NOTE.md) for full instructions on bootstrapping a fresh Laravel project.
-
-Quick start:
-
-```bash
+```powershell
 cd backend
-cp .env.example .env
-# Edit .env — set DB_DATABASE=guised_up, set EMBEDDING_SERVICE_URL=http://localhost:8000
-php artisan key:generate
-php artisan migrate
-php artisan db:seed
-php artisan serve
+copy .env.example .env
+# Edit .env: set DB_HOST=localhost, DB_PASSWORD=postgres, EMBEDDING_SERVICE_URL=http://localhost:8001
+
+docker run -d --name guisedup-api -p 8000:8000 `
+  -v "${PWD}:/app" -w /app php:8.4-cli `
+  bash -c "apt-get update -qq && apt-get install -y -qq libpq-dev unzip curl `
+  && docker-php-ext-install pdo_pgsql > /dev/null 2>&1 `
+  && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer `
+  && composer install --no-interaction --prefer-dist `
+  && php artisan key:generate && php artisan migrate --force `
+  && php artisan db:seed --force `
+  && php artisan serve --host=0.0.0.0 --port=8000"
 ```
+Verify: `curl http://localhost:8000/api/feed` (returns 401 — needs auth, which means it's working)
 
-The API is served at `http://localhost:8000/api`.
+### 4. Mobile App
 
-### Mobile App
-
-```bash
+```powershell
 cd mobile
 npm install
-npx react-native run-android
-# or
-npx react-native run-ios
+# Edit src/config.ts: set your LAN IP (run ipconfig to find it)
+npx expo start
 ```
+
+Scan the QR code with Expo Go (iOS/Android) to view the feed.
 
 ## API Endpoints
 
-| Method | Endpoint                        | Description                          |
-|--------|---------------------------------|--------------------------------------|
-| POST   | `/api/register`                 | Create a new user account            |
-| POST   | `/api/login`                    | Authenticate and receive a token     |
-| GET    | `/api/posts`                    | List posts (paginated)               |
-| POST   | `/api/posts`                    | Create a new post                    |
-| GET    | `/api/posts/{id}`               | Show a single post with interactions |
-| POST   | `/api/posts/{id}/view`          | Record a view                        |
-| POST   | `/api/posts/{id}/reply`         | Reply to a post                      |
-| POST   | `/api/posts/{id}/react`         | React to a post                      |
-| GET    | `/api/feed`                     | Personalized feed (embedding-based)  |
-| GET    | `/api/users/leaderboard`        | Top active users                     |
-| GET    | `/api/admin/spam`               | Spam detection report                |
-| POST   | `/api/admin/posts/{id}/flag`    | Flag a post as spam                  |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/register` | None | Create account |
+| POST | `/api/login` | None | Get Bearer token |
+| POST | `/api/posts` | Bearer | Create post (auto-generates embedding) |
+| GET | `/api/feed?page=1` | Bearer | Personalized ranked feed (20/page) |
+| GET | `/api/search?q=...` | Bearer | Vector similarity search (top 10) |
+| POST | `/api/interactions` | Bearer | Log view/reply/reaction |
+
+## Feed Ranking Formula
+
+```
+score = 0.30 × relationship_depth
+      + 0.25 × authenticity_score
+      + 0.25 × semantic_similarity
+      + 0.20 × time_decay (36h half-life)
+```
 
 ## Running Tests
 
-```bash
-cd backend
-php artisan test
+```powershell
+docker exec guisedup-api php artisan test
 ```
 
-## Credits
+Expect: 9 tests, 21 assertions, all passing.
 
-- **Manish** — Development and architecture
-- Submission for the **Guised Up Founding Engineer Assessment**
+## Project Structure
+
+```
+├── backend/              # Laravel API (Docker)
+├── docs/
+│   └── TSD.md           # Technical Solution Document
+├── embedding-service/    # Python FastAPI embedding sidecar
+├── mobile/               # React Native (Expo) app
+├── sql/
+│   └── queries.sql       # D1–D4 challenge queries
+└── README.md
+```
