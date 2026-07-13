@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { API_BASE_URL, DEBOUNCE_MS } from '../config';
+import ComposeModal from './ComposeModal';
 
 // ─── Theme types ──────────────────────────────────────────────────────────────
 
@@ -226,6 +227,8 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [showComposer, setShowComposer] = useState(false);
+
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<Post[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -352,6 +355,17 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
     viewAreaCoveragePercentThreshold: 50,
   }), []);
 
+  // ── Compose modal ────────────────────────────────────────────────────────────
+
+  const handlePublished = useCallback(() => {
+    setShowComposer(false);
+    fetchFeed(1, false);
+  }, [fetchFeed]);
+
+  const handleDismiss = useCallback(() => {
+    setShowComposer(false);
+  }, []);
+
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   const colorScheme = useColorScheme();
@@ -457,6 +471,23 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.brand }]}
+        onPress={() => setShowComposer(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      {/* Compose modal */}
+      <ComposeModal
+        visible={showComposer}
+        onDismiss={handleDismiss}
+        onPublished={handlePublished}
+        authToken={authToken}
+      />
     </View>
   );
 }
@@ -603,5 +634,23 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+    zIndex: 10,
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '400',
+    lineHeight: 30,
   },
 });
