@@ -12,6 +12,7 @@ import {
   ListRenderItemInfo,
 } from 'react-native';
 
+import { StatusBar } from 'expo-status-bar';
 import { API_BASE_URL, DEBOUNCE_MS } from '../config';
 import { Theme, LIGHT_THEME, DARK_THEME } from '../theme';
 import ComposeModal from './ComposeModal';
@@ -346,6 +347,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       {/* Search bar */}
       <View style={[styles.searchContainer, { backgroundColor: theme.searchBg }]}>
         <Text style={[styles.searchIcon, { color: theme.textTertiary }]}>🔍</Text>

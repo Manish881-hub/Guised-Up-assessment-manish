@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
 
@@ -38,7 +37,6 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="auto" />
       <FeedScreen authToken={authToken!} />
     </View>
   );
