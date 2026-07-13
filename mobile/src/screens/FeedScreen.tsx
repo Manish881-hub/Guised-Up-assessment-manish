@@ -10,12 +10,16 @@ import {
   RefreshControl,
   useColorScheme,
   ListRenderItemInfo,
+  Animated,
+  Pressable,
+  AccessibilityInfo,
 } from 'react-native';
 
 import { StatusBar } from 'expo-status-bar';
 import { API_BASE_URL, DEBOUNCE_MS } from '../config';
 import { Theme, LIGHT_THEME, DARK_THEME } from '../theme';
 import ComposeModal from './ComposeModal';
+import PostDetailModal from './PostDetailModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +33,8 @@ type Post = {
   score?: number;
   similarity?: number;
 };
+
+type FeedMode = 'discover' | 'connections';
 
 type FeedResponse = {
   data: Post[];
@@ -88,20 +94,52 @@ async function apiFetch<T>(
   return res.json() as Promise<T>;
 }
 
-// ─── Skeleton card ────────────────────────────────────────────────────────────
+// ─── Shimmer animation ────────────────────────────────────────────────────────
+
+function useShimmerAnimation(): Animated.Value {
+  const anim = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim, reduceMotion]);
+
+  return anim;
+}
+
+function ShimmerBar({ anim, style }: { anim: Animated.Value; style?: object }) {
+  const opacity = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.8],
+  });
+  return <Animated.View style={[{ opacity }, style]} />;
+}
 
 function SkeletonCard({ theme }: { theme: Theme }) {
+  const anim = useShimmerAnimation();
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, boxShadow: theme.cardShadow }]}>
       <View style={styles.cardHeader}>
-        <View style={[styles.avatar, { backgroundColor: theme.skeleton }]} />
-        <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: 100 }]} />
+        <ShimmerBar anim={anim} style={[styles.avatar, { backgroundColor: theme.skeleton }]} />
+        <ShimmerBar anim={anim} style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: 100 }]} />
       </View>
-      <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: '100%', marginTop: 10 }]} />
-      <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: '70%', marginTop: 6 }]} />
+      <ShimmerBar anim={anim} style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: '100%', marginTop: 10 }]} />
+      <ShimmerBar anim={anim} style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: '70%', marginTop: 6 }]} />
       <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
-        <View style={[styles.skeletonButton, { backgroundColor: theme.skeleton, width: 70 }]} />
-        <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: 50 }]} />
+        <ShimmerBar anim={anim} style={[styles.skeletonButton, { backgroundColor: theme.skeleton, width: 70 }]} />
+        <ShimmerBar anim={anim} style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: 50 }]} />
       </View>
     </View>
   );
@@ -111,7 +149,8 @@ function SkeletonCard({ theme }: { theme: Theme }) {
 
 interface PostCardProps {
   post: Post;
-  onReact: (postId: number) => void;
+  onReact: (postId: number, type: string) => void;
+  onComment: (post: Post) => void;
   theme: Theme;
 }
 
@@ -126,47 +165,135 @@ const AVATAR_COLORS = [
   '#00838F', '#F57C00', '#D81B60', '#283593',
 ];
 
-function PostCard({ post, onReact, theme }: PostCardProps) {
-  const [reacted, setReacted] = useState(false);
+type ReactionType = 'heart' | 'star' | 'fire';
+const REACTIONS: { type: ReactionType; icon: string }[] = [
+  { type: 'heart', icon: '❤️' },
+  { type: 'star', icon: '⭐' },
+  { type: 'fire', icon: '🔥' },
+];
+
+function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
+  const [reacted, setReacted] = useState<ReactionType | null>(null);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const initials = `U${post.user_id}`.slice(0, 2).toUpperCase();
   const badge = authenticityBadge(post.authenticity_score);
   const avatarColor = AVATAR_COLORS[post.user_id % AVATAR_COLORS.length];
 
-  const handlePress = useCallback(() => {
-    setReacted(true);
-    onReact(post.id);
-  }, [post.id, onReact]);
+  const handleReact = useCallback((type: ReactionType) => {
+    if (reacted) return;
+    setReacted(type);
+    onReact(post.id, type);
+  }, [post.id, onReact, reacted]);
+
+  const onPressIn = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      stiffness: 300,
+      damping: 30,
+      useNativeDriver: true,
+    }).start();
+  }, [scaleAnim]);
+
+  const onPressOut = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      stiffness: 300,
+      damping: 30,
+      useNativeDriver: true,
+    }).start();
+  }, [scaleAnim]);
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface, boxShadow: theme.cardShadow }]}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
-        <View style={styles.headerTextGroup}>
-          <Text style={[styles.username, { color: theme.textPrimary }]}>User #{post.user_id}</Text>
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-            <Text style={styles.badgeText}>{badge.label}</Text>
+    <Pressable onPressIn={onPressIn} onPressOut={onPressOut}>
+      <Animated.View style={[styles.card, { backgroundColor: theme.surface, boxShadow: theme.cardShadow, transform: [{ scale: scaleAnim }] }]}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <View style={styles.headerTextGroup}>
+            <Text style={[styles.username, { color: theme.textPrimary }]}>User #{post.user_id}</Text>
+            <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+              <Text style={styles.badgeText}>{badge.label}</Text>
+            </View>
           </View>
         </View>
-      </View>
-      <Text selectable style={[styles.body, { color: theme.textPrimary }]}>{post.body}</Text>
-      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
-        <TouchableOpacity
-          style={[styles.reactButton, { backgroundColor: reacted ? theme.success : theme.brand }]}
-          onPress={handlePress}
-          activeOpacity={0.7}
-          disabled={reacted}
-        >
-          <Text style={styles.reactButtonText}>
-            {reacted ? 'Reacted ✓' : 'React'}
-          </Text>
-        </TouchableOpacity>
-        <Text style={[styles.timestamp, { color: theme.textTertiary }]}>{timeAgo(post.created_at)}</Text>
-      </View>
-    </View>
+        <Text selectable style={[styles.body, { color: theme.textPrimary }]}>{post.body}</Text>
+        <View style={[styles.reactionRow, { borderTopColor: theme.border }]}>
+          <View style={styles.reactionIcons}>
+            {REACTIONS.map(({ type, icon }) => (
+              <TouchableOpacity
+                key={type}
+                style={[
+                  styles.reactionIcon,
+                  reacted === type && { backgroundColor: theme.brandLight },
+                ]}
+                onPress={() => handleReact(type)}
+                activeOpacity={0.6}
+                disabled={reacted !== null}
+              >
+                <Text style={[styles.reactionEmoji, reacted === type && styles.reactionEmojiActive]}>
+                  {icon}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.reactionIcon}
+              onPress={() => onComment(post)}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.reactionEmoji}>💬</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.timestamp, { color: theme.textTertiary }]}>{timeAgo(post.created_at)}</Text>
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 }
+
+// ─── Animated post card with entrance stagger ──────────────────────────────
+
+const AnimatedPostCard = React.memo(function AnimatedPostCard({
+  post, onReact, onComment, theme, index,
+}: PostCardProps & { index: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+  const reduceMotion = useRef(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then((v) => { reduceMotion.current = v; });
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion.current) {
+      opacity.setValue(1);
+      translateY.setValue(0);
+      return;
+    }
+    opacity.setValue(0);
+    translateY.setValue(20);
+    Animated.spring(opacity, {
+      toValue: 1,
+      stiffness: 150,
+      damping: 20,
+      useNativeDriver: true,
+      delay: index * 40,
+    }).start();
+    Animated.spring(translateY, {
+      toValue: 0,
+      stiffness: 150,
+      damping: 20,
+      useNativeDriver: true,
+      delay: index * 40,
+    }).start();
+  }, [post.id, index, opacity, translateY]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      <PostCard post={post} onReact={onReact} onComment={onComment} theme={theme} />
+    </Animated.View>
+  );
+});
 
 // ─── Feed screen ──────────────────────────────────────────────────────────────
 
@@ -181,6 +308,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
 
   const [showComposer, setShowComposer] = useState(false);
   const [manualDark, setManualDark] = useState(false);
+  const [feedMode, setFeedMode] = useState<FeedMode>('discover');
 
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<Post[] | null>(null);
@@ -200,7 +328,8 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
       if (append) setLoadingMore(true);
 
       try {
-        const response = await apiFetch<FeedResponse>(`/feed?page=${targetPage}`, authToken);
+        const path = feedMode === 'connections' ? '/real-connections/feed' : '/feed';
+        const response = await apiFetch<FeedResponse>(`${path}?page=${targetPage}`, authToken);
         setPosts((prev) => (append ? [...prev, ...response.data] : response.data));
         setHasMore(response.meta.has_more);
         setPage(targetPage);
@@ -213,7 +342,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
         setRefreshing(false);
       }
     },
-    [authToken],
+    [authToken, feedMode],
   );
 
   // ── Initial load ────────────────────────────────────────────────────────────
@@ -269,14 +398,16 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
     };
   }, [searchText, authToken]);
 
-  // ── React interaction ───────────────────────────────────────────────────────
+  // ── Reactions & detail ──────────────────────────────────────────────────────
+
+  const [detailPost, setDetailPost] = useState<Post | null>(null);
 
   const handleReact = useCallback(
-    async (postId: number) => {
+    async (postId: number, type: string) => {
       try {
         await apiFetch<unknown>('/interactions', authToken, {
           method: 'POST',
-          body: JSON.stringify({ post_id: postId, type: 'reaction' }),
+          body: JSON.stringify({ post_id: postId, type }),
         });
       } catch {
         // silently fail
@@ -284,6 +415,14 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
     },
     [authToken],
   );
+
+  const handleOpenDetail = useCallback((post: Post) => {
+    setDetailPost(post);
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setDetailPost(null);
+  }, []);
 
   // ── Auto-track views ────────────────────────────────────────────────────────
 
@@ -326,10 +465,10 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   const theme = useMemo(() => (isDark ? DARK_THEME : LIGHT_THEME), [isDark]);
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Post>) => (
-      <PostCard post={item} onReact={handleReact} theme={theme} />
+    ({ item, index }: ListRenderItemInfo<Post>) => (
+      <AnimatedPostCard post={item} onReact={handleReact} onComment={handleOpenDetail} theme={theme} index={index} />
     ),
-    [handleReact, theme],
+    [handleReact, handleOpenDetail, theme],
   );
 
   const keyExtractor = useCallback((item: Post) => String(item.id), []);
@@ -375,6 +514,26 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
         >
           <Text style={[styles.themeToggleText, { color: theme.textSecondary }]}>
             {isDark ? '☀️' : '🌙'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Feed mode tabs */}
+      <View style={[styles.modeTabs, { borderBottomColor: theme.border }]}>
+        <TouchableOpacity
+          style={[styles.modeTab, feedMode === 'discover' && { borderBottomColor: theme.brand }]}
+          onPress={() => setFeedMode('discover')}
+        >
+          <Text style={[styles.modeTabText, { color: feedMode === 'discover' ? theme.brand : theme.textTertiary }]}>
+            Discover
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, feedMode === 'connections' && { borderBottomColor: theme.brand }]}
+          onPress={() => setFeedMode('connections')}
+        >
+          <Text style={[styles.modeTabText, { color: feedMode === 'connections' ? theme.brand : theme.textTertiary }]}>
+            Real Connections
           </Text>
         </TouchableOpacity>
       </View>
@@ -439,13 +598,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
       )}
 
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.brand }]}
-        onPress={() => setShowComposer(true)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      <FABButton theme={theme} onPress={() => setShowComposer(true)} />
 
       {/* Compose modal */}
       <ComposeModal
@@ -455,7 +608,73 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
         authToken={authToken}
         theme={theme}
       />
+
+      {/* Post detail modal */}
+      <PostDetailModal
+        visible={detailPost !== null}
+        post={detailPost}
+        onDismiss={handleCloseDetail}
+        authToken={authToken}
+        theme={theme}
+      />
     </View>
+  );
+}
+
+// ─── Animated FAB ─────────────────────────────────────────────────────────────
+
+function FABButton({ theme, onPress }: { theme: Theme; onPress: () => void }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const mountAnim = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      mountAnim.setValue(1);
+      return;
+    }
+    Animated.spring(mountAnim, {
+      toValue: 1,
+      stiffness: 100,
+      damping: 12,
+      useNativeDriver: true,
+    }).start();
+  }, [mountAnim, reduceMotion]);
+
+  const onPressIn = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      stiffness: 300,
+      damping: 30,
+      useNativeDriver: true,
+    }).start();
+  }, [scaleAnim]);
+
+  const onPressOut = useCallback(() => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      stiffness: 300,
+      damping: 30,
+      useNativeDriver: true,
+    }).start();
+  }, [scaleAnim]);
+
+  return (
+    <Animated.View style={{
+      position: 'absolute', bottom: 24, right: 24, zIndex: 10,
+      transform: [{ scale: Animated.multiply(mountAnim, scaleAnim) }],
+      opacity: mountAnim,
+    }}>
+      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <View style={[styles.fab, { backgroundColor: theme.brand }]}>
+          <Text style={styles.fabText}>+</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -497,6 +716,23 @@ const styles = StyleSheet.create({
   },
   themeToggleText: {
     fontSize: 18,
+  },
+  modeTabs: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  modeTabText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   skeletonContainer: {
     paddingHorizontal: 16,
@@ -560,6 +796,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  reactionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  reactionIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  reactionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionEmoji: {
+    fontSize: 20,
+    opacity: 0.7,
+  },
+  reactionEmojiActive: {
+    opacity: 1,
   },
   reactButton: {
     paddingVertical: 10,
