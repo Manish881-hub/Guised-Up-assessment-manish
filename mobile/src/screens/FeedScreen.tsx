@@ -21,6 +21,7 @@ type Post = {
   body: string;
   image_url: string | null;
   created_at: string;
+  authenticity_score: number;
   score?: number;
   similarity?: number;
 };
@@ -109,8 +110,15 @@ interface PostCardProps {
   onReact: (postId: number) => void;
 }
 
+function authenticityBadge(score: number): { label: string; bg: string } {
+  if (score >= 0.7) return { label: 'Verified', bg: '#2E7D32' };
+  if (score >= 0.5) return { label: 'Likely Authentic', bg: '#E65100' };
+  return { label: 'Low Signal', bg: '#9E9E9E' };
+}
+
 function PostCard({ post, onReact }: PostCardProps) {
   const initials = `U${post.user_id}`.slice(0, 2).toUpperCase();
+  const badge = authenticityBadge(post.authenticity_score);
 
   return (
     <View style={styles.card}>
@@ -118,7 +126,12 @@ function PostCard({ post, onReact }: PostCardProps) {
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
-        <Text style={styles.username}>User #{post.user_id}</Text>
+        <View style={styles.headerTextGroup}>
+          <Text style={styles.username}>User #{post.user_id}</Text>
+          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+            <Text style={styles.badgeText}>{badge.label}</Text>
+          </View>
+        </View>
       </View>
       <Text style={styles.body}>{post.body}</Text>
       <View style={styles.cardFooter}>
@@ -415,11 +428,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  headerTextGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   username: {
     fontSize: 15,
     fontWeight: '600',
     color: '#333',
     flexShrink: 1,
+  },
+  badge: {
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   body: {
     fontSize: 15,
