@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -117,8 +117,14 @@ function authenticityBadge(score: number): { label: string; bg: string } {
 }
 
 function PostCard({ post, onReact }: PostCardProps) {
+  const [reacted, setReacted] = useState(false);
   const initials = `U${post.user_id}`.slice(0, 2).toUpperCase();
   const badge = authenticityBadge(post.authenticity_score);
+
+  const handlePress = useCallback(() => {
+    setReacted(true);
+    onReact(post.id);
+  }, [post.id, onReact]);
 
   return (
     <View style={styles.card}>
@@ -136,11 +142,14 @@ function PostCard({ post, onReact }: PostCardProps) {
       <Text style={styles.body}>{post.body}</Text>
       <View style={styles.cardFooter}>
         <TouchableOpacity
-          style={styles.reactButton}
-          onPress={() => onReact(post.id)}
+          style={[styles.reactButton, reacted && styles.reactButtonActive]}
+          onPress={handlePress}
           activeOpacity={0.7}
+          disabled={reacted}
         >
-          <Text style={styles.reactButtonText}>React</Text>
+          <Text style={[styles.reactButtonText, reacted && styles.reactButtonTextActive]}>
+            {reacted ? 'Reacted ✓' : 'React'}
+          </Text>
         </TouchableOpacity>
         <Text style={styles.timestamp}>{timeAgo(post.created_at)}</Text>
       </View>
@@ -262,6 +271,29 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
     [authToken],
   );
 
+  // ── Auto-track views ────────────────────────────────────────────────────────
+
+  const trackedViews = useRef<Set<number>>(new Set());
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: { isViewable: boolean; item: Post }[] }) => {
+      viewableItems.forEach(({ isViewable, item }) => {
+        if (isViewable && !trackedViews.current.has(item.id)) {
+          trackedViews.current.add(item.id);
+          apiFetch<unknown>('/interactions', authToken, {
+            method: 'POST',
+            body: JSON.stringify({ post_id: item.id, type: 'view' }),
+          }).catch(() => {});
+        }
+      });
+    },
+    [authToken],
+  );
+
+  const viewabilityConfig = useMemo(() => ({
+    viewAreaCoveragePercentThreshold: 50,
+  }), []);
+
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   const renderItem = useCallback(
@@ -349,6 +381,8 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
           onEndReached={onEndReached}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -468,10 +502,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 20,
   },
+  reactButtonActive: {
+    backgroundColor: '#2E7D32',
+  },
   reactButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  reactButtonTextActive: {
+    color: '#FFFFFF',
   },
   timestamp: {
     fontSize: 12,
