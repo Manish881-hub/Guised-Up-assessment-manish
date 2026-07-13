@@ -9,6 +9,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Pressable,
 } from 'react-native';
 
 import { API_BASE_URL } from '../config';
@@ -67,6 +69,30 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
 
   const counterColor = remaining < 50 ? theme.brand : remaining < 200 ? '#E65100' : theme.textTertiary;
 
+  // ── Press animations ──────────────────────────────────────────────────────
+
+  const PostButton = ({ onPress, disabled, loading }: {
+    onPress: () => void; disabled: boolean; loading: boolean;
+  }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        onPressIn={() => Animated.spring(scaleAnim, { toValue: 0.93, stiffness: 300, damping: 30, useNativeDriver: true }).start()}
+        onPressOut={() => Animated.spring(scaleAnim, { toValue: 1, stiffness: 300, damping: 30, useNativeDriver: true }).start()}
+      >
+        <Animated.View style={[styles.postButton, { backgroundColor: theme.brand, transform: [{ scale: scaleAnim }] }, disabled && styles.postButtonDisabled]}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.postButtonText}>Post</Text>
+          )}
+        </Animated.View>
+      </Pressable>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -83,17 +109,7 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
             <Text style={[styles.dismissText, { color: theme.brand }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.title, { color: theme.textPrimary }]}>New Post</Text>
-          <TouchableOpacity
-            onPress={handlePost}
-            disabled={!canPost}
-            style={[styles.postButton, { backgroundColor: theme.brand }, !canPost && styles.postButtonDisabled]}
-          >
-            {posting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.postButtonText}>Post</Text>
-            )}
-          </TouchableOpacity>
+          <PostButton onPress={handlePost} disabled={!canPost} loading={posting} />
         </View>
 
         <TextInput
@@ -110,7 +126,9 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
         />
 
         <View style={styles.footer}>
-          {error && <Text style={[styles.errorText, { color: theme.brand }]}>{error}</Text>}
+          {error && (
+            <Text style={[styles.errorText, { color: theme.brand }]}>{error}</Text>
+          )}
           <Text style={[styles.counter, { color: counterColor }]}>
             {remaining}/{MAX_CHARS}
           </Text>
