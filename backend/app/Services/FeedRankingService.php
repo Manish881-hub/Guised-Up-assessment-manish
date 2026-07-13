@@ -19,34 +19,66 @@ class FeedRankingService
     {
         $offset = ($page - 1) * $perPage;
         $interestVector = $this->interestVector($viewerId);
-        $vectorString = '[' . implode(',', $interestVector) . ']';
         $halfLife = self::RECENCY_HALF_LIFE_HOURS;
 
-        $posts = DB::select(
-            "SELECT p.id, p.user_id, p.body, p.image_url, p.authenticity_score, p.created_at, p.updated_at,
-                    ? * COALESCE(rs.score, ?) +
-                    ? * COALESCE(p.authenticity_score, 0.5) +
-                    ? * (1 - (pe.embedding <=> ?::vector)) +
-                    ? * EXP(-EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600.0 * LN(2) / ?) AS score
-             FROM posts p
-             INNER JOIN post_embeddings pe ON pe.post_id = p.id
-             LEFT JOIN relationship_scores rs ON rs.viewer_id = ? AND rs.author_id = p.user_id
-             WHERE p.created_at > NOW() - INTERVAL '14 days'
-             ORDER BY score DESC
-             LIMIT ? OFFSET ?",
-            [
-                self::W_RELATIONSHIP,
-                self::COLD_START_RELATIONSHIP_SCORE,
-                self::W_AUTHENTICITY,
-                self::W_SEMANTIC,
-                $vectorString,
-                self::W_RECENCY,
-                $halfLife,
-                $viewerId,
-                $perPage + 1,
-                $offset,
-            ]
-        );
+        $isColdStart = true;
+        foreach ($interestVector as $v) {
+            if (abs($v) > 1e-10) {
+                $isColdStart = false;
+                break;
+            }
+        }
+
+        if ($isColdStart) {
+            $posts = DB::select(
+                "SELECT p.id, p.user_id, p.body, p.image_url, p.authenticity_score, p.created_at, p.updated_at,
+                        ? * COALESCE(rs.score, ?) +
+                        ? * COALESCE(p.authenticity_score, 0.5) +
+                        ? * EXP(-EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600.0 * LN(2) / ?) AS score
+                 FROM posts p
+                 LEFT JOIN relationship_scores rs ON rs.viewer_id = ? AND rs.author_id = p.user_id
+                 WHERE p.created_at > NOW() - INTERVAL '14 days'
+                 ORDER BY score DESC
+                 LIMIT ? OFFSET ?",
+                [
+                    self::W_RELATIONSHIP + self::W_SEMANTIC,
+                    self::COLD_START_RELATIONSHIP_SCORE,
+                    self::W_AUTHENTICITY,
+                    self::W_RECENCY,
+                    $halfLife,
+                    $viewerId,
+                    $perPage + 1,
+                    $offset,
+                ]
+            );
+        } else {
+            $vectorString = '[' . implode(',', $interestVector) . ']';
+            $posts = DB::select(
+                "SELECT p.id, p.user_id, p.body, p.image_url, p.authenticity_score, p.created_at, p.updated_at,
+                        ? * COALESCE(rs.score, ?) +
+                        ? * COALESCE(p.authenticity_score, 0.5) +
+                        ? * (1 - (pe.embedding <=> ?::vector)) +
+                        ? * EXP(-EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600.0 * LN(2) / ?) AS score
+                 FROM posts p
+                 INNER JOIN post_embeddings pe ON pe.post_id = p.id
+                 LEFT JOIN relationship_scores rs ON rs.viewer_id = ? AND rs.author_id = p.user_id
+                 WHERE p.created_at > NOW() - INTERVAL '14 days'
+                 ORDER BY score DESC
+                 LIMIT ? OFFSET ?",
+                [
+                    self::W_RELATIONSHIP,
+                    self::COLD_START_RELATIONSHIP_SCORE,
+                    self::W_AUTHENTICITY,
+                    self::W_SEMANTIC,
+                    $vectorString,
+                    self::W_RECENCY,
+                    $halfLife,
+                    $viewerId,
+                    $perPage + 1,
+                    $offset,
+                ]
+            );
+        }
 
         $hasMore = count($posts) > $perPage;
 
@@ -64,12 +96,15 @@ class FeedRankingService
     {
 
         $recentPosts = DB::select(
-            "SELECT AVG(pe.embedding) AS avg_embedding
-             FROM interactions i
-             INNER JOIN post_embeddings pe ON pe.post_id = i.post_id
-             WHERE i.user_id = ?
-             ORDER BY i.created_at DESC
-             LIMIT 20",
+            "SELECT AVG(sub.embedding) AS avg_embedding
+             FROM (
+                 SELECT pe.embedding
+                 FROM interactions i
+                 INNER JOIN post_embeddings pe ON pe.post_id = i.post_id
+                 WHERE i.user_id = ?
+                 ORDER BY i.created_at DESC
+                 LIMIT 20
+             ) AS sub",
             [$viewerId]
         );
 

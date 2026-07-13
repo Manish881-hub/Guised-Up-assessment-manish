@@ -1,18 +1,22 @@
 {
   "name": "guised-up-mobile",
   "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "start": "react-native start",
-    "android": "react-native run-android",
-    "ios": "react-native run-ios"
-  },
+  "main": "index.js",
   "dependencies": {
-    "react": "18.2.0",
-    "react-native": "0.74.0"
+    "expo": "~57.0.4",
+    "expo-status-bar": "~57.0.0",
+    "react": "19.2.3",
+    "react-native": "0.86.0"
   },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "private": true,
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "@types/react": "^18.2.0"
+    "@types/react": "^19.2.17",
+    "typescript": "^6.0.3"
   }
 }

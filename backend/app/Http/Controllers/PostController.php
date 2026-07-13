@@ -31,7 +31,9 @@ class PostController extends Controller
         $embedding = $this->embeddingClient->embed($post->body);
 
         if ($embedding !== null) {
-            $vectorString = '[' . implode(',', $embedding) . ']';
+            $vector = $embedding['embedding'] ?? $embedding;
+            $flat = (isset($vector[0]) && is_array($vector[0])) ? $vector[0] : $vector;
+            $vectorString = '[' . implode(',', $flat) . ']';
             DB::statement(
                 'INSERT INTO post_embeddings (post_id, embedding) VALUES (?, ?::vector)',
                 [$post->id, $vectorString]

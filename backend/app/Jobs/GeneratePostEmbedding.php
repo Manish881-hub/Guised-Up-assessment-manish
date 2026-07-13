@@ -40,7 +40,9 @@ class GeneratePostEmbedding implements ShouldQueue
             throw new \RuntimeException("Failed to generate embedding for post {$this->postId}");
         }
 
-        $vectorString = '[' . implode(',', $embedding) . ']';
+        $vector = $embedding['embedding'] ?? $embedding;
+        $flat = (isset($vector[0]) && is_array($vector[0])) ? $vector[0] : $vector;
+        $vectorString = '[' . implode(',', $flat) . ']';
 
         DB::statement(
             'INSERT INTO post_embeddings (post_id, embedding) VALUES (?, ?::vector)

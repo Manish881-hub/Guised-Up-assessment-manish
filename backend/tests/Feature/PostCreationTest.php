@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Services\EmbeddingClient;
 use Tests\TestCase;
 
 class PostCreationTest extends TestCase
@@ -12,6 +13,10 @@ class PostCreationTest extends TestCase
 
     public function test_authenticated_user_can_create_a_post(): void
     {
+        $mock = $this->createMock(EmbeddingClient::class);
+        $mock->method('embed')->willReturn(array_fill(0, 384, 0.01));
+        $this->instance(EmbeddingClient::class, $mock);
+
         $user = User::factory()->create();
 
         $response = $this->actingAs($user, 'sanctum')->postJson('/api/posts', [
