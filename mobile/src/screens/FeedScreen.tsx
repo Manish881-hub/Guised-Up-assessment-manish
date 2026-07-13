@@ -116,10 +116,16 @@ function authenticityBadge(score: number): { label: string; bg: string } {
   return { label: 'Low Signal', bg: '#9E9E9E' };
 }
 
+const AVATAR_COLORS = [
+  '#E4572E', '#2E7D32', '#1565C0', '#6A1B9A',
+  '#00838F', '#F57C00', '#D81B60', '#283593',
+];
+
 function PostCard({ post, onReact }: PostCardProps) {
   const [reacted, setReacted] = useState(false);
   const initials = `U${post.user_id}`.slice(0, 2).toUpperCase();
   const badge = authenticityBadge(post.authenticity_score);
+  const avatarColor = AVATAR_COLORS[post.user_id % AVATAR_COLORS.length];
 
   const handlePress = useCallback(() => {
     setReacted(true);
@@ -129,7 +135,7 @@ function PostCard({ post, onReact }: PostCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.headerTextGroup}>
@@ -399,67 +405,78 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles (iOS HIG + Material 3 inspired) ───────────────────────────────────
+
+const theme = {
+  bg: '#F5F4F0',
+  surface: '#FFFFFF',
+  brand: '#E4572E',
+  brandLight: '#FDE8E0',
+  textPrimary: '#1C1C1E',
+  textSecondary: '#636366',
+  textTertiary: '#AEAEB2',
+  border: '#E5E3DE',
+  success: '#2E7D32',
+  warning: '#E65100',
+  neutral: '#9E9E9E',
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F5F2',
+    backgroundColor: theme.bg,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 16,
     paddingBottom: 8,
-    backgroundColor: '#F7F5F2',
+    backgroundColor: theme.bg,
   },
   searchInput: {
     flex: 1,
-    height: 44,
-    backgroundColor: '#FFFFFF',
+    height: 48,
+    backgroundColor: theme.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
-    fontSize: 16,
-    color: '#333',
-    borderWidth: 1,
-    borderColor: '#E8E4DF',
+    fontSize: 17,
+    color: theme.textPrimary,
   },
   searchSpinner: {
-    marginLeft: 10,
+    marginLeft: 12,
   },
   skeletonContainer: {
     paddingHorizontal: 16,
     paddingTop: 8,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.surface,
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E4572E',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   headerTextGroup: {
@@ -469,66 +486,72 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   username: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: theme.textPrimary,
     flexShrink: 1,
   },
   badge: {
-    paddingVertical: 3,
+    paddingVertical: 4,
     paddingHorizontal: 10,
-    borderRadius: 10,
+    borderRadius: 8,
     marginLeft: 8,
   },
   badgeText: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   body: {
-    fontSize: 15,
-    color: '#444',
-    lineHeight: 22,
-    marginBottom: 12,
+    fontSize: 16,
+    color: theme.textPrimary,
+    lineHeight: 24,
+    marginBottom: 16,
   },
   cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
   },
   reactButton: {
-    backgroundColor: '#E4572E',
-    paddingVertical: 6,
-    paddingHorizontal: 18,
+    backgroundColor: theme.brand,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 20,
+    minWidth: 100,
+    alignItems: 'center',
   },
   reactButtonActive: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: theme.success,
   },
   reactButtonText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   reactButtonTextActive: {
     color: '#FFFFFF',
   },
   timestamp: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: theme.textTertiary,
   },
   skeleton: {
-    backgroundColor: '#E8E4DF',
+    backgroundColor: '#E5E3DE',
   },
   skeletonText: {
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#E8E4DF',
+    backgroundColor: '#E5E3DE',
   },
   skeletonButton: {
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#E8E4DF',
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E5E3DE',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -536,7 +559,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   footerLoader: {
-    paddingVertical: 16,
+    paddingVertical: 20,
     alignItems: 'center',
   },
   center: {
@@ -547,24 +570,24 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#E4572E',
+    color: theme.brand,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#E4572E',
-    paddingVertical: 10,
-    paddingHorizontal: 28,
+    backgroundColor: theme.brand,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
     borderRadius: 24,
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: theme.textTertiary,
     textAlign: 'center',
   },
 });
