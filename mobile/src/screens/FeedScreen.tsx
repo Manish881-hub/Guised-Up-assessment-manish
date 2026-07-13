@@ -8,10 +8,61 @@ import {
   ActivityIndicator,
   StyleSheet,
   RefreshControl,
+  useColorScheme,
   ListRenderItemInfo,
 } from 'react-native';
 
 import { API_BASE_URL, DEBOUNCE_MS } from '../config';
+
+// ─── Theme types ──────────────────────────────────────────────────────────────
+
+interface Theme {
+  bg: string;
+  surface: string;
+  brand: string;
+  brandLight: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  border: string;
+  success: string;
+  warning: string;
+  neutral: string;
+  skeleton: string;
+  cardShadow: string;
+}
+
+const LIGHT_THEME: Theme = {
+  bg: '#F5F4F0',
+  surface: '#FFFFFF',
+  brand: '#E4572E',
+  brandLight: '#FDE8E0',
+  textPrimary: '#1C1C1E',
+  textSecondary: '#636366',
+  textTertiary: '#AEAEB2',
+  border: '#E5E3DE',
+  success: '#2E7D32',
+  warning: '#E65100',
+  neutral: '#9E9E9E',
+  skeleton: '#E5E3DE',
+  cardShadow: '0 1px 3px rgba(0,0,0,0.04)',
+};
+
+const DARK_THEME: Theme = {
+  bg: '#1C1C1E',
+  surface: '#2C2C2E',
+  brand: '#E4572E',
+  brandLight: '#3A1A10',
+  textPrimary: '#F5F5F7',
+  textSecondary: '#AEAEB2',
+  textTertiary: '#636366',
+  border: '#38383A',
+  success: '#2E7D32',
+  warning: '#E65100',
+  neutral: '#9E9E9E',
+  skeleton: '#38383A',
+  cardShadow: '0 1px 3px rgba(0,0,0,0.2)',
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,18 +137,18 @@ async function apiFetch<T>(
 
 // ─── Skeleton card ────────────────────────────────────────────────────────────
 
-function SkeletonCard() {
+function SkeletonCard({ theme }: { theme: Theme }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface, boxShadow: theme.cardShadow }]}>
       <View style={styles.cardHeader}>
-        <View style={[styles.avatar, styles.skeleton]} />
-        <View style={[styles.skeletonText, { width: 100 }]} />
+        <View style={[styles.avatar, { backgroundColor: theme.skeleton }]} />
+        <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: 100 }]} />
       </View>
-      <View style={[styles.skeletonText, { width: '100%', marginTop: 10 }]} />
-      <View style={[styles.skeletonText, { width: '70%', marginTop: 6 }]} />
-      <View style={styles.cardFooter}>
-        <View style={[styles.skeletonButton, { width: 70 }]} />
-        <View style={[styles.skeletonText, { width: 50 }]} />
+      <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: '100%', marginTop: 10 }]} />
+      <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: '70%', marginTop: 6 }]} />
+      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+        <View style={[styles.skeletonButton, { backgroundColor: theme.skeleton, width: 70 }]} />
+        <View style={[styles.skeletonText, { backgroundColor: theme.skeleton, width: 50 }]} />
       </View>
     </View>
   );
@@ -108,6 +159,7 @@ function SkeletonCard() {
 interface PostCardProps {
   post: Post;
   onReact: (postId: number) => void;
+  theme: Theme;
 }
 
 function authenticityBadge(score: number): { label: string; bg: string } {
@@ -121,7 +173,7 @@ const AVATAR_COLORS = [
   '#00838F', '#F57C00', '#D81B60', '#283593',
 ];
 
-function PostCard({ post, onReact }: PostCardProps) {
+function PostCard({ post, onReact, theme }: PostCardProps) {
   const [reacted, setReacted] = useState(false);
   const initials = `U${post.user_id}`.slice(0, 2).toUpperCase();
   const badge = authenticityBadge(post.authenticity_score);
@@ -133,31 +185,31 @@ function PostCard({ post, onReact }: PostCardProps) {
   }, [post.id, onReact]);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: theme.surface, boxShadow: theme.cardShadow }]}>
       <View style={styles.cardHeader}>
         <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.headerTextGroup}>
-          <Text style={styles.username}>User #{post.user_id}</Text>
+          <Text style={[styles.username, { color: theme.textPrimary }]}>User #{post.user_id}</Text>
           <View style={[styles.badge, { backgroundColor: badge.bg }]}>
             <Text style={styles.badgeText}>{badge.label}</Text>
           </View>
         </View>
       </View>
-      <Text style={styles.body}>{post.body}</Text>
-      <View style={styles.cardFooter}>
+      <Text selectable style={[styles.body, { color: theme.textPrimary }]}>{post.body}</Text>
+      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
         <TouchableOpacity
-          style={[styles.reactButton, reacted && styles.reactButtonActive]}
+          style={[styles.reactButton, { backgroundColor: reacted ? theme.success : theme.brand }]}
           onPress={handlePress}
           activeOpacity={0.7}
           disabled={reacted}
         >
-          <Text style={[styles.reactButtonText, reacted && styles.reactButtonTextActive]}>
+          <Text style={styles.reactButtonText}>
             {reacted ? 'Reacted ✓' : 'React'}
           </Text>
         </TouchableOpacity>
-        <Text style={styles.timestamp}>{timeAgo(post.created_at)}</Text>
+        <Text style={[styles.timestamp, { color: theme.textTertiary }]}>{timeAgo(post.created_at)}</Text>
       </View>
     </View>
   );
@@ -302,11 +354,14 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
+  const colorScheme = useColorScheme();
+  const theme = useMemo(() => (colorScheme === 'dark' ? DARK_THEME : LIGHT_THEME), [colorScheme]);
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Post>) => (
-      <PostCard post={item} onReact={handleReact} />
+      <PostCard post={item} onReact={handleReact} theme={theme} />
     ),
-    [handleReact],
+    [handleReact, theme],
   );
 
   const keyExtractor = useCallback((item: Post) => String(item.id), []);
@@ -315,7 +370,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
     if (!loadingMore) return null;
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#E4572E" />
+        <ActivityIndicator size="small" color={theme.brand} />
       </View>
     );
   };
@@ -323,13 +378,13 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
       {/* Search bar */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: theme.bg }]}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { backgroundColor: theme.surface, color: theme.textPrimary }]}
           placeholder="Search posts…"
-          placeholderTextColor="#999"
+          placeholderTextColor={theme.textTertiary}
           value={searchText}
           onChangeText={setSearchText}
           autoCapitalize="none"
@@ -339,7 +394,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
           <ActivityIndicator
             style={styles.searchSpinner}
             size="small"
-            color="#E4572E"
+            color={theme.brand}
           />
         )}
       </View>
@@ -347,18 +402,18 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
       {/* Skeleton loaders */}
       {showSkeleton && (
         <View style={styles.skeletonContainer}>
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
+          <SkeletonCard theme={theme} />
+          <SkeletonCard theme={theme} />
+          <SkeletonCard theme={theme} />
         </View>
       )}
 
       {/* Error state */}
       {!showSkeleton && error !== null && posts.length === 0 && (
         <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: theme.brand }]}>{error}</Text>
           <TouchableOpacity
-            style={styles.retryButton}
+            style={[styles.retryButton, { backgroundColor: theme.brand }]}
             onPress={() => {
               setLoading(true);
               fetchFeed(1, false);
@@ -372,7 +427,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
       {/* Empty state */}
       {isEmpty && (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: theme.textTertiary }]}>
             {searchResults !== null ? 'No posts match that search' : 'No posts yet'}
           </Text>
         </View>
@@ -389,12 +444,13 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
           ListFooterComponent={renderFooter}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          contentInsetAdjustmentBehavior="automatic"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#E4572E"
-              colors={['#E4572E']}
+              tintColor={theme.brand}
+              colors={[theme.brand]}
             />
           }
           contentContainerStyle={styles.listContent}
@@ -405,26 +461,11 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   );
 }
 
-// ─── Styles (iOS HIG + Material 3 inspired) ───────────────────────────────────
-
-const theme = {
-  bg: '#F5F4F0',
-  surface: '#FFFFFF',
-  brand: '#E4572E',
-  brandLight: '#FDE8E0',
-  textPrimary: '#1C1C1E',
-  textSecondary: '#636366',
-  textTertiary: '#AEAEB2',
-  border: '#E5E3DE',
-  success: '#2E7D32',
-  warning: '#E65100',
-  neutral: '#9E9E9E',
-};
+// ─── Static layout styles (theme colors applied inline) ────────────────────
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.bg,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -432,16 +473,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
-    backgroundColor: theme.bg,
   },
   searchInput: {
     flex: 1,
     height: 48,
-    backgroundColor: theme.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 17,
-    color: theme.textPrimary,
   },
   searchSpinner: {
     marginLeft: 12,
@@ -451,15 +489,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   card: {
-    backgroundColor: theme.surface,
     borderRadius: 16,
     padding: 20,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
+    borderCurve: 'continuous',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -472,7 +505,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    borderCurve: 'continuous',
   },
   avatarText: {
     color: '#FFFFFF',
@@ -488,7 +521,6 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 16,
     fontWeight: '600',
-    color: theme.textPrimary,
     flexShrink: 1,
   },
   badge: {
@@ -505,7 +537,6 @@ const styles = StyleSheet.create({
   },
   body: {
     fontSize: 16,
-    color: theme.textPrimary,
     lineHeight: 24,
     marginBottom: 16,
   },
@@ -515,43 +546,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.border,
   },
   reactButton: {
-    backgroundColor: theme.brand,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
     minWidth: 100,
     alignItems: 'center',
   },
-  reactButtonActive: {
-    backgroundColor: theme.success,
-  },
   reactButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
   },
-  reactButtonTextActive: {
-    color: '#FFFFFF',
-  },
   timestamp: {
     fontSize: 13,
-    color: theme.textTertiary,
-  },
-  skeleton: {
-    backgroundColor: '#E5E3DE',
   },
   skeletonText: {
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#E5E3DE',
   },
   skeletonButton: {
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#E5E3DE',
   },
   listContent: {
     paddingHorizontal: 16,
@@ -570,12 +587,10 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: theme.brand,
     textAlign: 'center',
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: theme.brand,
     paddingVertical: 12,
     paddingHorizontal: 32,
     borderRadius: 24,
@@ -587,7 +602,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: theme.textTertiary,
     textAlign: 'center',
   },
 });
