@@ -394,13 +394,15 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       {/* Search bar */}
-      <View style={[styles.searchContainer, { backgroundColor: theme.bg }]}>
+      <View style={[styles.searchContainer, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.searchIcon, { color: theme.textTertiary }]}>🔍</Text>
         <TextInput
-          style={[styles.searchInput, { backgroundColor: theme.surface, color: theme.textPrimary }]}
+          style={[styles.searchInput, { color: theme.textPrimary }]}
           placeholder="Search posts…"
           placeholderTextColor={theme.textTertiary}
           value={searchText}
           onChangeText={setSearchText}
+          returnKeyType="search"
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -501,19 +503,24 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
+    fontSize: 16,
   },
   searchInput: {
     flex: 1,
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 17,
+    fontSize: 16,
+    paddingVertical: 0,
   },
   searchSpinner: {
-    marginLeft: 12,
+    marginLeft: 8,
   },
   skeletonContainer: {
     paddingHorizontal: 16,
