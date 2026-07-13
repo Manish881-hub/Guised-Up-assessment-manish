@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Application;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
@@ -13,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         //
+    })
+    ->withSchedule(function (Schedule $schedule) {
+        $schedule->command('feed:refresh-relationship-scores')->everyFiveMinutes();
+        $schedule->command('feed:refresh-interest-vectors')->everyFifteenMinutes();
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
