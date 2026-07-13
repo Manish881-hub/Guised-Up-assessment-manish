@@ -179,6 +179,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   const [error, setError] = useState<string | null>(null);
 
   const [showComposer, setShowComposer] = useState(false);
+  const [manualDark, setManualDark] = useState(false);
 
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<Post[] | null>(null);
@@ -320,7 +321,8 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   const colorScheme = useColorScheme();
-  const theme = useMemo(() => (colorScheme === 'dark' ? DARK_THEME : LIGHT_THEME), [colorScheme]);
+  const isDark = manualDark || colorScheme === 'dark';
+  const theme = useMemo(() => (isDark ? DARK_THEME : LIGHT_THEME), [isDark]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Post>) => (
@@ -364,6 +366,15 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
             color={theme.brand}
           />
         )}
+        <TouchableOpacity
+          style={styles.themeToggle}
+          onPress={() => setManualDark(prev => !prev)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.themeToggleText, { color: theme.textSecondary }]}>
+            {isDark ? '☀️' : '🌙'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Skeleton loaders */}
@@ -473,6 +484,17 @@ const styles = StyleSheet.create({
   },
   searchSpinner: {
     marginLeft: 8,
+  },
+  themeToggle: {
+    marginLeft: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeToggleText: {
+    fontSize: 18,
   },
   skeletonContainer: {
     paddingHorizontal: 16,
