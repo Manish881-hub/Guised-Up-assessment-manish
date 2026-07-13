@@ -11,7 +11,7 @@ class InteractionController extends Controller
     {
         $validated = $request->validate([
             'post_id' => 'required|integer|exists:posts,id',
-            'type' => 'required|string|in:view,reply,reaction',
+            'type' => 'required|string|in:view,reply,reaction,heart,star,fire',
         ]);
 
         $interaction = Interaction::create([
