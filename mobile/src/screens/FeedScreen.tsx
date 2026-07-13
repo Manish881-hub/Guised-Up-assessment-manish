@@ -20,6 +20,7 @@ import ComposeModal from './ComposeModal';
 interface Theme {
   bg: string;
   surface: string;
+  searchBg: string;
   brand: string;
   brandLight: string;
   textPrimary: string;
@@ -36,6 +37,7 @@ interface Theme {
 const LIGHT_THEME: Theme = {
   bg: '#F5F4F0',
   surface: '#FFFFFF',
+  searchBg: '#EBEBEB',
   brand: '#E4572E',
   brandLight: '#FDE8E0',
   textPrimary: '#1C1C1E',
@@ -52,6 +54,7 @@ const LIGHT_THEME: Theme = {
 const DARK_THEME: Theme = {
   bg: '#1C1C1E',
   surface: '#2C2C2E',
+  searchBg: '#3A3A3C',
   brand: '#E4572E',
   brandLight: '#3A1A10',
   textPrimary: '#F5F5F7',
@@ -394,7 +397,7 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
       {/* Search bar */}
-      <View style={[styles.searchContainer, { backgroundColor: theme.surface }]}>
+      <View style={[styles.searchContainer, { backgroundColor: theme.searchBg }]}>
         <Text style={[styles.searchIcon, { color: theme.textTertiary }]}>🔍</Text>
         <TextInput
           style={[styles.searchInput, { color: theme.textPrimary }]}
