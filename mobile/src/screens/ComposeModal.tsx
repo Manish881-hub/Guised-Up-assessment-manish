@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import { API_BASE_URL } from '../config';
+import type { Theme } from '../theme';
 
 const MAX_CHARS = 2000;
 
@@ -20,9 +21,10 @@ interface ComposeModalProps {
   onDismiss: () => void;
   onPublished: () => void;
   authToken: string;
+  theme: Theme;
 }
 
-export default function ComposeModal({ visible, onDismiss, onPublished, authToken }: ComposeModalProps) {
+export default function ComposeModal({ visible, onDismiss, onPublished, authToken, theme }: ComposeModalProps) {
   const [body, setBody] = useState('');
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
     onDismiss();
   }, [posting, onDismiss]);
 
-  const counterColor = remaining < 50 ? '#E4572E' : remaining < 200 ? '#E65100' : '#AEAEB2';
+  const counterColor = remaining < 50 ? theme.brand : remaining < 200 ? '#E65100' : theme.textTertiary;
 
   return (
     <Modal
@@ -73,18 +75,18 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
       onRequestClose={handleDismiss}
     >
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: theme.bg }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Text style={styles.dismissText}>Cancel</Text>
+            <Text style={[styles.dismissText, { color: theme.brand }]}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>New Post</Text>
+          <Text style={[styles.title, { color: theme.textPrimary }]}>New Post</Text>
           <TouchableOpacity
             onPress={handlePost}
             disabled={!canPost}
-            style={[styles.postButton, !canPost && styles.postButtonDisabled]}
+            style={[styles.postButton, { backgroundColor: theme.brand }, !canPost && styles.postButtonDisabled]}
           >
             {posting ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -96,9 +98,9 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
 
         <TextInput
           ref={inputRef}
-          style={styles.input}
+          style={[styles.input, { color: theme.textPrimary }]}
           placeholder="What's the fashion move?"
-          placeholderTextColor="#AEAEB2"
+          placeholderTextColor={theme.textTertiary}
           value={body}
           onChangeText={setBody}
           multiline
@@ -108,7 +110,7 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
         />
 
         <View style={styles.footer}>
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {error && <Text style={[styles.errorText, { color: theme.brand }]}>{error}</Text>}
           <Text style={[styles.counter, { color: counterColor }]}>
             {remaining}/{MAX_CHARS}
           </Text>
@@ -121,7 +123,6 @@ export default function ComposeModal({ visible, onDismiss, onPublished, authToke
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
@@ -131,24 +132,21 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E3DE',
   },
   dismissText: {
     fontSize: 17,
-    color: '#E4572E',
   },
   title: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#1C1C1E',
   },
   postButton: {
-    backgroundColor: '#E4572E',
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 20,
     minWidth: 64,
     alignItems: 'center',
+    borderCurve: 'continuous',
   },
   postButtonDisabled: {
     opacity: 0.4,
@@ -161,7 +159,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 17,
-    color: '#1C1C1E',
     paddingHorizontal: 16,
     paddingTop: 16,
     lineHeight: 24,
@@ -176,7 +173,6 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     fontSize: 14,
-    color: '#E4572E',
     marginRight: 12,
   },
   counter: {
