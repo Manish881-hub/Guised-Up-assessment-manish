@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 
 import { StatusBar } from 'expo-status-bar';
+import * as Haptics from 'expo-haptics';
+import { SymbolView } from 'expo-symbols';
 import { API_BASE_URL, DEBOUNCE_MS } from '../config';
 import { Theme, LIGHT_THEME, DARK_THEME } from '../theme';
 import ComposeModal from './ComposeModal';
@@ -166,10 +168,10 @@ const AVATAR_COLORS = [
 ];
 
 type ReactionType = 'heart' | 'star' | 'fire';
-const REACTIONS: { type: ReactionType; icon: string }[] = [
-  { type: 'heart', icon: '❤️' },
-  { type: 'star', icon: '⭐' },
-  { type: 'fire', icon: '🔥' },
+const REACTIONS: { type: ReactionType; icon: string; symbol: string }[] = [
+  { type: 'heart', icon: '❤️', symbol: 'heart.fill' },
+  { type: 'star', icon: '⭐', symbol: 'star.fill' },
+  { type: 'fire', icon: '🔥', symbol: 'flame.fill' },
 ];
 
 function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
@@ -182,6 +184,7 @@ function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
   const handleReact = useCallback((type: ReactionType) => {
     if (reacted) return;
     setReacted(type);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onReact(post.id, type);
   }, [post.id, onReact, reacted]);
 
@@ -220,7 +223,7 @@ function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
         <Text selectable style={[styles.body, { color: theme.textPrimary }]}>{post.body}</Text>
         <View style={[styles.reactionRow, { borderTopColor: theme.border }]}>
           <View style={styles.reactionIcons}>
-            {REACTIONS.map(({ type, icon }) => (
+            {REACTIONS.map(({ type, icon, symbol }) => (
               <TouchableOpacity
                 key={type}
                 style={[
@@ -231,9 +234,12 @@ function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
                 activeOpacity={0.6}
                 disabled={reacted !== null}
               >
-                <Text style={[styles.reactionEmoji, reacted === type && styles.reactionEmojiActive]}>
-                  {icon}
-                </Text>
+                <SymbolView
+                  name={symbol as any}
+                  size={22}
+                  tintColor={reacted === type ? theme.brand : theme.textSecondary}
+                  fallback={<Text style={[styles.reactionEmoji, reacted === type && styles.reactionEmojiActive]}>{icon}</Text>}
+                />
               </TouchableOpacity>
             ))}
             <TouchableOpacity
@@ -241,7 +247,12 @@ function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
               onPress={() => onComment(post)}
               activeOpacity={0.6}
             >
-              <Text style={styles.reactionEmoji}>💬</Text>
+              <SymbolView
+                name="message.fill"
+                size={22}
+                tintColor={theme.textSecondary}
+                fallback={<Text style={styles.reactionEmoji}>💬</Text>}
+              />
             </TouchableOpacity>
           </View>
           <Text style={[styles.timestamp, { color: theme.textTertiary }]}>{timeAgo(post.created_at)}</Text>
