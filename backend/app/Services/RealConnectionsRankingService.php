@@ -61,10 +61,10 @@ class RealConnectionsRankingService
                 "SELECT p.id, p.user_id, p.body, p.image_url, p.authenticity_score, p.created_at,
                         ? * COALESCE(rs.score, ?) +
                         ? * COALESCE(p.authenticity_score, 0.5) +
-                        ? * (1 - (pe.embedding <=> ?::vector)) +
+                        ? * COALESCE(1 - (pe.embedding <=> ?::vector), 0) +
                         ? * EXP(-EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600.0 * LN(2) / ?) AS score
                  FROM posts p
-                 INNER JOIN post_embeddings pe ON pe.post_id = p.id
+                 LEFT JOIN post_embeddings pe ON pe.post_id = p.id
                  LEFT JOIN relationship_scores rs ON rs.viewer_id = ? AND rs.author_id = p.user_id
                  WHERE p.created_at > NOW() - INTERVAL '{$this->candidateWindow()}'
                  ORDER BY score DESC
