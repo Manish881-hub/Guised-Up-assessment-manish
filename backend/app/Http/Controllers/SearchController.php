@@ -18,27 +18,43 @@ class SearchController extends Controller
             'q' => 'required|string|max:200',
         ]);
 
-        $embedding = $this->embeddingClient->embed($validated['q']);
+        $query = $validated['q'];
 
-        if ($embedding === null) {
-            return response()->json(['message' => 'Search service unavailable'], 503);
+        try {
+            $embedding = $this->embeddingClient->embed($query);
+        } catch (\Throwable $e) {
+            $embedding = null;
         }
 
-        $vector = $embedding['embedding'] ?? $embedding;
-        $vectorString = '[' . implode(',', $vector) . ']';
+        if ($embedding !== null) {
+            $vector = $embedding['embedding'] ?? $embedding;
+            $vectorString = '[' . implode(',', $vector) . ']';
 
-        $results = DB::select(
+            $results = DB::select(
+                "SELECT p.id, p.user_id, p.body, p.image_url, p.authenticity_score, p.created_at, p.updated_at,
+                        1 - (pe.embedding <=> ?::vector) AS similarity
+                 FROM posts p
+                 INNER JOIN post_embeddings pe ON pe.post_id = p.id
+                 ORDER BY similarity DESC
+                 LIMIT 10",
+                [$vectorString]
+            );
+
+            if (!empty($results)) {
+                return response()->json(['data' => $results]);
+            }
+        }
+
+        $fallback = DB::select(
             "SELECT p.id, p.user_id, p.body, p.image_url, p.authenticity_score, p.created_at, p.updated_at,
-                    1 - (pe.embedding <=> ?::vector) AS similarity
+                    0 AS similarity
              FROM posts p
-             INNER JOIN post_embeddings pe ON pe.post_id = p.id
-             ORDER BY similarity DESC
+             WHERE p.body ILIKE ?
+             ORDER BY p.created_at DESC
              LIMIT 10",
-            [$vectorString]
+            ["%{$query}%"]
         );
 
-        return response()->json([
-            'data' => $results,
-        ]);
+        return response()->json(['data' => $fallback]);
     }
 }
