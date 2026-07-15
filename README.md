@@ -107,7 +107,7 @@ score = 0.30 × relationship_depth
 docker exec guisedup-api php artisan test
 ```
 
-Expect: 9 tests, 21 assertions, all passing.
+Expect: 11 tests, all passing.
 
 ## Project Structure
 
