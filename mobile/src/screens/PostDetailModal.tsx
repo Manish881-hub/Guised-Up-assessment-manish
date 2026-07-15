@@ -10,6 +10,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 
 import { API_BASE_URL } from '../config';
@@ -72,6 +73,19 @@ export default function PostDetailModal({ visible, post, onDismiss, authToken, t
   const [commentText, setCommentText] = useState('');
   const [posting, setPosting] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const morphAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      morphAnim.setValue(0);
+      Animated.spring(morphAnim, {
+        toValue: 1,
+        stiffness: 200,
+        damping: 24,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, morphAnim]);
 
   const fetchComments = useCallback(async () => {
     if (!post) return;
@@ -181,10 +195,14 @@ export default function PostDetailModal({ visible, post, onDismiss, authToken, t
     );
   };
 
+  const cardScale = morphAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] });
+  const cardOpacity = morphAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.3, 1] });
+  const cardTranslateY = morphAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] });
+
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
       presentationStyle="pageSheet"
       onRequestClose={handleDismiss}
     >
@@ -192,53 +210,58 @@ export default function PostDetailModal({ visible, post, onDismiss, authToken, t
         style={[styles.container, { backgroundColor: theme.bg }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Text style={[styles.dismissText, { color: theme.brand }]}>Close</Text>
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>Post</Text>
-          <View style={{ width: 50 }} />
-        </View>
-
-        {loading && comments.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.brand} />
+        <Animated.View style={[styles.morphContainer, {
+          opacity: cardOpacity,
+          transform: [{ scale: cardScale }, { translateY: cardTranslateY }],
+        }]}>
+          <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={handleDismiss} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={[styles.dismissText, { color: theme.brand }]}>Close</Text>
+            </TouchableOpacity>
+            <Text style={[styles.title, { color: theme.textPrimary }]}>Post</Text>
+            <View style={{ width: 50 }} />
           </View>
-        ) : (
-          <FlatList
-            data={comments}
-            renderItem={renderComment}
-            keyExtractor={(item) => String(item.id)}
-            ListHeaderComponent={renderHeader}
-            ListEmptyComponent={renderEmpty}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
 
-        <View style={[styles.inputBar, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
-          <TextInput
-            ref={inputRef}
-            style={[styles.input, { color: theme.textPrimary, backgroundColor: theme.searchBg }]}
-            placeholder="Write a comment..."
-            placeholderTextColor={theme.textTertiary}
-            value={commentText}
-            onChangeText={setCommentText}
-            multiline
-            maxLength={1000}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, { backgroundColor: theme.brand }, (!commentText.trim() || posting) && styles.sendButtonDisabled]}
-            onPress={handleSend}
-            disabled={!commentText.trim() || posting}
-          >
-            {posting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.sendButtonText}>Send</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+          {loading && comments.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.brand} />
+            </View>
+          ) : (
+            <FlatList
+              data={comments}
+              renderItem={renderComment}
+              keyExtractor={(item) => String(item.id)}
+              ListHeaderComponent={renderHeader}
+              ListEmptyComponent={renderEmpty}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+
+          <View style={[styles.inputBar, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+            <TextInput
+              ref={inputRef}
+              style={[styles.input, { color: theme.textPrimary, backgroundColor: theme.searchBg }]}
+              placeholder="Write a comment..."
+              placeholderTextColor={theme.textTertiary}
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, { backgroundColor: theme.brand }, (!commentText.trim() || posting) && styles.sendButtonDisabled]}
+              onPress={handleSend}
+              disabled={!commentText.trim() || posting}
+            >
+              {posting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.sendButtonText}>Send</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -246,6 +269,9 @@ export default function PostDetailModal({ visible, post, onDismiss, authToken, t
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  morphContainer: {
     flex: 1,
   },
   header: {

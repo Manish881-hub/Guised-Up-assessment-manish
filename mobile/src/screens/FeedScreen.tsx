@@ -11,6 +11,7 @@ import {
   useColorScheme,
   ListRenderItemInfo,
   Animated,
+  Easing,
   Pressable,
   AccessibilityInfo,
 } from 'react-native';
@@ -129,7 +130,7 @@ function ShimmerBar({ anim, style }: { anim: Animated.Value; style?: object }) {
   return <Animated.View style={[{ opacity }, style]} />;
 }
 
-function SkeletonCard({ theme }: { theme: Theme }) {
+const SkeletonCard = React.memo(function SkeletonCard({ theme }: { theme: Theme }) {
   const anim = useShimmerAnimation();
   return (
     <View style={[styles.card, { backgroundColor: theme.surface, boxShadow: theme.cardShadow }]}>
@@ -145,7 +146,7 @@ function SkeletonCard({ theme }: { theme: Theme }) {
       </View>
     </View>
   );
-}
+});
 
 // ─── Post card ────────────────────────────────────────────────────────────────
 
@@ -174,7 +175,7 @@ const REACTIONS: { type: ReactionType; icon: string; symbol: string }[] = [
   { type: 'fire', icon: '🔥', symbol: 'flame.fill' },
 ];
 
-function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
+const PostCard = React.memo(function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
   const [reacted, setReacted] = useState<ReactionType | null>(null);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const initials = `U${post.user_id}`.slice(0, 2).toUpperCase();
@@ -260,7 +261,7 @@ function PostCard({ post, onReact, onComment, theme }: PostCardProps) {
       </Animated.View>
     </Pressable>
   );
-}
+});
 
 // ─── Animated post card with entrance stagger ──────────────────────────────
 
@@ -303,6 +304,60 @@ const AnimatedPostCard = React.memo(function AnimatedPostCard({
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>
       <PostCard post={post} onReact={onReact} onComment={onComment} theme={theme} />
     </Animated.View>
+  );
+});
+
+// ─── Floating emojis for empty state ─────────────────────────────────────────
+
+const FLOATING_EMOJIS = ['✨', '💫', '🌟', '⭐', '🦋', '🌸'];
+
+function FloatingEmojiItem({ emoji, delay, left }: { emoji: string; delay: number; left: number }) {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => { AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion); }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: 1, duration: 3000, delay, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 3000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [floatAnim, delay, reduceMotion]);
+
+  if (reduceMotion) return null;
+
+  const translateY = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, -60],
+  });
+  const opacity = floatAnim.interpolate({
+    inputRange: [0, 0.3, 0.7, 1],
+    outputRange: [0, 0.6, 0.6, 0],
+  });
+  const scale = floatAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 1.2],
+  });
+
+  return (
+    <Animated.Text style={[styles.floatingEmoji, { left, transform: [{ translateY }, { scale }], opacity }]}>
+      {emoji}
+    </Animated.Text>
+  );
+}
+
+const FloatingEmojis = React.memo(function FloatingEmojis() {
+  return (
+    <View style={styles.floatingEmojiContainer} pointerEvents="none">
+      {FLOATING_EMOJIS.map((emoji, i) => (
+        <FloatingEmojiItem key={emoji} emoji={emoji} delay={i * 800} left={15 + ((i * 55) % 250)} />
+      ))}
+    </View>
   );
 });
 
@@ -577,6 +632,8 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
       {/* Empty state */}
       {isEmpty && (
         <View style={styles.center}>
+          <FloatingEmojis />
+          <Text style={[styles.emptyIcon, { color: theme.textTertiary }]}>📭</Text>
           <Text style={[styles.emptyText, { color: theme.textTertiary }]}>
             {searchResults !== null ? 'No posts match that search' : 'No posts yet'}
           </Text>
@@ -634,9 +691,10 @@ export default function FeedScreen({ authToken }: { authToken: string }): React.
 
 // ─── Animated FAB ─────────────────────────────────────────────────────────────
 
-function FABButton({ theme, onPress }: { theme: Theme; onPress: () => void }) {
+const FABButton = React.memo(function FABButton({ theme, onPress }: { theme: Theme; onPress: () => void }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const mountAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
@@ -654,11 +712,20 @@ function FABButton({ theme, onPress }: { theme: Theme; onPress: () => void }) {
       damping: 12,
       useNativeDriver: true,
     }).start();
-  }, [mountAnim, reduceMotion]);
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [mountAnim, pulseAnim, reduceMotion]);
 
   const onPressIn = useCallback(() => {
     Animated.spring(scaleAnim, {
-      toValue: 0.9,
+      toValue: 0.88,
       stiffness: 300,
       damping: 30,
       useNativeDriver: true,
@@ -674,10 +741,12 @@ function FABButton({ theme, onPress }: { theme: Theme; onPress: () => void }) {
     }).start();
   }, [scaleAnim]);
 
+  const combinedScale = Animated.multiply(Animated.multiply(mountAnim, scaleAnim), pulseAnim);
+
   return (
     <Animated.View style={{
       position: 'absolute', bottom: 24, right: 24, zIndex: 10,
-      transform: [{ scale: Animated.multiply(mountAnim, scaleAnim) }],
+      transform: [{ scale: combinedScale }],
       opacity: mountAnim,
     }}>
       <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
@@ -687,7 +756,7 @@ function FABButton({ theme, onPress }: { theme: Theme; onPress: () => void }) {
       </Pressable>
     </Animated.View>
   );
-}
+});
 
 // ─── Static layout styles (theme colors applied inline) ────────────────────
 
@@ -886,6 +955,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  floatingEmojiContainer: {
+    position: 'absolute',
+    width: '100%',
+    height: 200,
+    top: -60,
+  },
+  floatingEmoji: {
+    position: 'absolute',
+    fontSize: 20,
+    top: 80,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
   },
   emptyText: {
     fontSize: 16,
